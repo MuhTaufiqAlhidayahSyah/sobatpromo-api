@@ -1,5 +1,8 @@
 {
   "name": "sobatpromo/api",
-  "description": "SobatPromo API",
-  "require": {}
+  "description": "SobatPromo API using PostgreSQL",
+  "require": {
+    "ext-pdo": "*",
+    "ext-pdo_pgsql": "*"
+  }
 }
