@@ -68,6 +68,7 @@
       9: "https://projekkelompok9-production.up.railway.app/api/get_dataAOV.php"
     };
 
+    // --- Generate tombol kelompok ---
     const container = document.getElementById("kelompokButtons");
     Object.keys(kelompokAPIs).forEach(num => {
       const btn = document.createElement("button");
@@ -76,21 +77,42 @@
       container.appendChild(btn);
     });
 
+    // --- Ambil data dari API eksternal ---
     async function loadExternalAPI(num) {
-      const apiURL = `${kelompokAPIs[num]}?action=list`;
+      const apiURL = `${kelompokAPIs[num]}`;
+      document.getElementById("promoList").innerHTML = `<p>Sedang memuat data dari Kelompok ${num}...</p>`;
       try {
         const res = await fetch(apiURL);
-        const data = await res.json();
-        renderPromos(data, kelompokAPIs[num]);
+        const raw = await res.json();
+
+        // deteksi struktur data otomatis
+        let data = [];
+        if (Array.isArray(raw)) {
+          data = raw;
+        } else if (raw.data && Array.isArray(raw.data)) {
+          data = raw.data;
+        } else if (raw.results && Array.isArray(raw.results)) {
+          data = raw.results;
+        } else if (raw.records && Array.isArray(raw.records)) {
+          data = raw.records;
+        } else {
+          console.warn("Format tidak dikenali:", raw);
+          data = [];
+        }
+
+        renderPromos(data, kelompokAPIs[num], num);
       } catch (err) {
-        document.getElementById("promoList").innerHTML = "Gagal memuat data dari Kelompok " + num;
+        console.error("Gagal memuat data:", err);
+        document.getElementById("promoList").innerHTML =
+          `<p style="color:red;">Gagal memuat data dari Kelompok ${num}.</p>`;
       }
     }
 
-    function renderPromos(data, baseURL) {
+    // --- Tampilkan daftar promo ---
+    function renderPromos(data, baseURL, num) {
       let html = `
         <h3>Data dari ${baseURL}</h3>
-        <button onclick="showAddForm('${baseURL}')">Tambah Promo</button>
+        <button onclick="showAddForm('${baseURL}', ${num})">Tambah Data</button>
       `;
 
       if (!Array.isArray(data) || data.length === 0) {
@@ -99,12 +121,12 @@
         data.forEach(item => {
           html += `
             <div class="promo">
-              <b>${item.title || item.name || 'Tanpa Judul'}</b>
-              <small>${item.description || item.deskripsi || 'Tanpa deskripsi'}</small>
-              <em>${item.valid_until || ''}</em>
+              <b>${item.title || item.name || item.product_name || item.judul || 'Tanpa Judul'}</b>
+              <small>${item.description || item.deskripsi || item.detail || item.desc || 'Tanpa deskripsi'}</small>
+              <em>${item.valid_until || item.tanggal || item.date || item.created_at || ''}</em>
               <div class="actions">
-                <button onclick="editData('${baseURL}', ${item.id}, '${item.title || item.name}', '${item.description || item.deskripsi}', '${item.valid_until || ''}')">Edit</button>
-                <button class="delete" onclick="deleteData('${baseURL}', ${item.id})">Hapus</button>
+                <button onclick="editData('${baseURL}', ${item.id || item.ID || 0}, '${item.title || item.name || ''}', '${item.description || item.deskripsi || ''}', '${item.valid_until || ''}')">Edit</button>
+                <button class="delete" onclick="deleteData('${baseURL}', ${item.id || item.ID || 0})">Hapus</button>
               </div>
             </div>`;
         });
@@ -112,59 +134,76 @@
       document.getElementById("promoList").innerHTML = html;
     }
 
-    function showAddForm(baseURL) {
+    // --- Form tambah data ---
+    function showAddForm(baseURL, num) {
       document.getElementById("promoList").innerHTML = `
-        <h3>Tambah Promo</h3>
+        <h3>Tambah Data Baru</h3>
         <input id="title" placeholder="Judul"><br>
         <textarea id="description" placeholder="Deskripsi"></textarea><br>
         <input id="valid_until" type="date"><br>
-        <button onclick="saveData('${baseURL}')">Simpan</button>
-        <button onclick="loadExternalAPI()">Batal</button>
+        <button onclick="saveData('${baseURL}', ${num})">Simpan</button>
+        <button onclick="loadExternalAPI(${num})">Batal</button>
       `;
     }
 
-    async function saveData(baseURL) {
+    // --- Simpan data baru ---
+    async function saveData(baseURL, num) {
       const title = document.getElementById("title").value;
       const description = document.getElementById("description").value;
       const valid_until = document.getElementById("valid_until").value;
-      await fetch(`${baseURL}?action=create`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, valid_until })
-      });
-      alert("Data berhasil disimpan");
-      location.reload();
+      try {
+        const res = await fetch(`${baseURL}?action=create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, description, valid_until })
+        });
+        alert("Data berhasil disimpan");
+        loadExternalAPI(num);
+      } catch (err) {
+        alert("Gagal menyimpan data");
+      }
     }
 
-    async function editData(baseURL, id, title, description, valid_until) {
+    // --- Edit data ---
+    function editData(baseURL, id, title, description, valid_until) {
       document.getElementById("promoList").innerHTML = `
-        <h3>Edit Promo</h3>
+        <h3>Edit Data</h3>
         <input id="title" value="${title}"><br>
         <textarea id="description">${description}</textarea><br>
         <input id="valid_until" type="date" value="${valid_until}"><br>
         <button onclick="updateData('${baseURL}', ${id})">Perbarui</button>
-        <button onclick="location.reload()">Batal</button>
+        <button onclick="window.location.reload()">Batal</button>
       `;
     }
 
+    // --- Update data ---
     async function updateData(baseURL, id) {
       const title = document.getElementById("title").value;
       const description = document.getElementById("description").value;
       const valid_until = document.getElementById("valid_until").value;
-      await fetch(`${baseURL}?action=update&id=${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, valid_until })
-      });
-      alert("Data diperbarui");
-      location.reload();
+      try {
+        await fetch(`${baseURL}?action=update&id=${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, description, valid_until })
+        });
+        alert("Data diperbarui");
+        window.location.reload();
+      } catch (err) {
+        alert("Gagal memperbarui data");
+      }
     }
 
+    // --- Hapus data ---
     async function deleteData(baseURL, id) {
       if (!confirm("Hapus data ini?")) return;
-      await fetch(`${baseURL}?action=delete&id=${id}`, { method: "DELETE" });
-      alert("Data dihapus");
-      location.reload();
+      try {
+        await fetch(`${baseURL}?action=delete&id=${id}`, { method: "DELETE" });
+        alert("Data dihapus");
+        window.location.reload();
+      } catch (err) {
+        alert("Gagal menghapus data");
+      }
     }
   </script>
 </body>
