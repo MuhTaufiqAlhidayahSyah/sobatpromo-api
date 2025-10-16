@@ -196,15 +196,25 @@
 
     // --- Hapus data ---
     async function deleteData(baseURL, id) {
-      if (!confirm("Hapus data ini?")) return;
-      try {
-        await fetch(`${baseURL}?action=delete&id=${id}`, { method: "DELETE" });
-        alert("Data dihapus");
-        window.location.reload();
-      } catch (err) {
-        alert("Gagal menghapus data");
-      }
+  if (!confirm("Hapus data ini?")) return;
+  try {
+    // coba dulu pakai DELETE
+    let res = await fetch(`${baseURL}?action=delete&id=${id}`, { method: "DELETE" });
+
+    // kalau gagal, coba lagi pakai POST
+    if (!res.ok) {
+      res = await fetch(`${baseURL}?action=delete&id=${id}`, { method: "POST" });
     }
+
+    const result = await res.json();
+    alert(result.message || "Data dihapus (respons tidak diketahui)");
+    location.reload();
+  } catch (err) {
+    alert("Gagal menghapus data: " + err.message);
+  }
+}
+
   </script>
 </body>
 </html>
+
